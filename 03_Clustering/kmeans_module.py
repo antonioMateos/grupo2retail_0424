@@ -63,8 +63,8 @@ def plot_cluster_sizes(feature_matrix):
 
 def apply_kmeans_and_plot(optimal_k, data, feature_matrix):
     kmeans = apply_kmeans(data, optimal_k)
-    feature_matrix_with_clusters = add_cluster_labels(feature_matrix, kmeans.labels_, cluster_col)
-    fig = plot_cluster_sizes(feature_matrix_with_clusters, cluster_col)
+    feature_matrix_with_clusters = add_cluster_labels(feature_matrix, kmeans.labels_)
+    fig = plot_cluster_sizes(feature_matrix_with_clusters)
     plt.show()
     return kmeans, feature_matrix_with_clusters
 
@@ -194,11 +194,12 @@ def redux_dimensions_pca_and_cluster(df, n_clusters=3, n_components=2, cluster_c
         importance_df = importance_df[['Feature', 'Loading_PC1']]
 
     # Create plots
-    figs = plot_pca_results(pca_df, importance_df, n_components, cluster_col)
+    figs = plot_pca_results(pca_df, importance_df, n_components)
+    plt.show()
     
-    return pca_df, importance_df, figs
+    return pca_df, importance_df
 
-def plot_pca_results(pca_df, importance_df, n_components, cluster_col):
+def plot_pca_results(pca_df, importance_df, n_components):
     figs = []
     
     fig, ax = plt.subplots(figsize=(15, 5))

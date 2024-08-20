@@ -1,4 +1,4 @@
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import silhouette_score
@@ -40,9 +40,16 @@ def plot_elbow_silhouette(data, max_k=20):
     
     plt.show()
 
-def apply_clustering(data, **kwargs):
-    k = kwargs.get('n_clusters', 4)
-    model = KMeans(n_clusters=k, random_state=42)
+def apply_clustering(data, method='kmeans', **kwargs):
+    if method == 'kmeans':
+        k = kwargs.get('n_clusters', 4)
+        model = KMeans(n_clusters=k, random_state=42)
+    elif method == 'dbscan':
+        eps = kwargs.get('eps', 0.5)
+        min_samples = kwargs.get('min_samples', 5)
+        model = DBSCAN(eps=eps, min_samples=min_samples)
+    else:
+        raise ValueError("El método debe ser 'kmeans' o 'dbscan'")
     
     clusters = model.fit_predict(data)
     return clusters
@@ -76,7 +83,7 @@ def draw_convex_hull(ax, x_data, y_data, **kwargs):
     hull_points = points[hull.vertices]
     ax.fill(hull_points[:, 0], hull_points[:, 1], **kwargs)
 
-def plot_clusters(pca_components, clusters, k=None):
+def plot_clusters(pca_components, clusters, method='kmeans', k=None):
     fig, ax = plt.subplots(figsize=(15, 6))
     
     df = pd.DataFrame({
@@ -98,7 +105,7 @@ def plot_clusters(pca_components, clusters, k=None):
                 ax, cluster_data['PCA1'], cluster_data['PCA2'], alpha=0.2
             )
     
-    title = 'Clustering'
+    title = f'{method.upper()} Clustering'
     if k is not None:
         title += f' (k = {k})'
     
@@ -112,7 +119,7 @@ def predict_clusters(rf, new_products, preprocessor):
     predicted_clusters = rf.predict(new_products_preprocessed)
     return predicted_clusters
 
-def main(df_features, cluster_col=None, **kwargs):
+def main(df_features, method='kmeans', cluster_col=None, **kwargs):
     # Separar características y etiquetas (si las etiquetas están presentes en df_features)
     if cluster_col and cluster_col in df_features.columns:
         X = df_features.drop(columns=cluster_col)
@@ -121,8 +128,6 @@ def main(df_features, cluster_col=None, **kwargs):
         X = df_features
         y = None
     
-    ########################################################################################
-    # REFACTORIZAR # Sacar a función externa
     # Identificar columnas numéricas y categóricas
     num_cols = X.select_dtypes(include=['int64', 'float64']).columns
     cat_cols = X.select_dtypes(include=['object', 'category']).columns
@@ -139,12 +144,12 @@ def main(df_features, cluster_col=None, **kwargs):
         data_preprocessed = preprocessor.fit_transform(X)
     else:
         data_preprocessed = X.values
-    ########################################################################################
-
-    # Analisis elbow / silhouette
-    plot_elbow_silhouette(data_preprocessed)
     
-    clusters = apply_clustering(data_preprocessed, **kwargs)
+    # Método de clustering
+    if method == 'kmeans':
+        plot_elbow_silhouette(data_preprocessed)
+    
+    clusters = apply_clustering(data_preprocessed, method=method, **kwargs)
     
     # Entrenamiento de Random Forest si hay etiquetas
     if y is not None:
@@ -174,8 +179,8 @@ def main(df_features, cluster_col=None, **kwargs):
     print(contributions)
     
     # Graficar los clusters
-    k = kwargs.get('n_clusters')
-    plot_clusters(pca_components, clusters, k=k)
+    k = kwargs.get('n_clusters') if method == 'kmeans' else None
+    plot_clusters(pca_components, clusters, method=method, k=k)
     
     return rf, preprocessor, loadings, contributions
 
@@ -203,14 +208,9 @@ def plot_feature_importance(data, cluster_labels, threshold=0.05):
     model.fit(data, cluster_labels)
     importances = model.feature_importances_
     
-    # Ordenar las características por importancia
-    sorted_indices = np.argsort(importances)[::-1]
-    sorted_features = data.columns[sorted_indices]
-    sorted_importances = importances[sorted_indices]
-    
     # Gráfico de barras de la importancia de las características (horizontal)
     plt.figure(figsize=(10, 6))
-    ax = sns.barplot(y=sorted_features, x=sorted_importances, palette='viridis')
+    ax = sns.barplot(y=data.columns, x=importances, palette='viridis')
     
     # Añadir una línea roja discontinua vertical en el umbral especificado
     plt.axvline(x=threshold, color='red', linestyle='--')
@@ -249,7 +249,12 @@ def perform_clustering_analysis(data, n_clusters=3):
 # EJEMPLO DE USO
 # Ejemplo con K-means
 # rf_model_kmeans, preprocessor_kmeans, pca_loadings_kmeans, pca_contributions_kmeans = main(
-#     df_features, n_clusters=4
+#     df_features, method='kmeans', n_clusters=4
+# )
+
+# Ejemplo con DBSCAN
+# rf_model_dbscan, preprocessor_dbscan, pca_loadings_dbscan, pca_contributions_dbscan = main(
+#     df_features, method='dbscan', eps=0.5, min_samples=5
 # )
 
 # Ejemplo de predicción con nuevos datos
