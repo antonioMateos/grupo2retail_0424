@@ -1,6 +1,6 @@
 import featuretools as ft
 
-def create_features(df_items, df_shops, df_ws):
+def create_features(df_items, df_shops, df_ws, fc_config):
     # Crear el EntitySet
     es = ft.EntitySet(id="sales_data")
 
@@ -14,36 +14,24 @@ def create_features(df_items, df_shops, df_ws):
     es = es.add_relationship("shops", "store_code", "sales", "store_code")
     es = es.add_relationship("items", "item", "sales", "item")
 
-    # Crear características agregadas relevantes para los productos
-    feature_matrix_sales, feature_defs_sales = ft.dfs(
+    # Configuramos creacion caracteristicas
+    target_df = fc_config['target_df']
+    agg_primitives = fc_config['agg_primitives']
+    trans_primitives = fc_config['trans_primitives']
+    max_depth = fc_config['max_depth']
+
+    feature_matrix, feature_defs = ft.dfs(
         entityset=es,
-        target_dataframe_name="items",
-        agg_primitives=["sum", "mean", "std", "count"],  
-        trans_primitives=[],
-        max_depth=2
+        target_dataframe_name=target_df,
+        agg_primitives=agg_primitives,  
+        trans_primitives=trans_primitives,
+        max_depth=max_depth
     )
 
-    get_features_descriptions(feature_defs_sales)
+    # # Imprimir descripciones de caracteristicas creadas
+    # get_features_descriptions(feature_defs)
 
-    # Seleccionar y renombrar características relevantes para el clustering
-    selected_features = {
-        'COUNT(sales)': 'num_sales',                   
-        'SUM(sales.units)': 'total_units_sold',        
-        'SUM(sales.raw_earn)': 'total_revenue',        
-        'MEAN(sales.sell_price)': 'avg_sell_price',    
-        'STD(sales.sell_price)': 'std_sell_price',     
-        'STD(sales.units)': 'std_units_sold',          
-        'MEAN(sales.units)': 'avg_units_per_week',     
-        'MEAN(sales.week)': 'avg_week',                
-        'STD(sales.week)': 'std_week',                 
-        'MEAN(sales.year)': 'avg_year'                 
-    }
-
-    # Filtrar y renombrar la matriz de características
-    fm_selected_sales = feature_matrix_sales[list(selected_features.keys())]
-    fm_selected_sales.rename(columns=selected_features, inplace=True)
-
-    return fm_selected_sales
+    return feature_matrix, feature_defs
 
 # Obtener descripciones de las características
 def get_features_descriptions(features):
@@ -51,11 +39,29 @@ def get_features_descriptions(features):
         feat_desc = ft.describe_feature(desc)
         print(f'{desc}: {feat_desc}')
 
+# Seleccionar caracteristicas
+def select_features(feature_matrix, selected_features):
+    fm_selected = feature_matrix[list(selected_features.keys())]
+    return fm_selected
+
 # Renombrar caracteristicas
-def rename_features(feature_matrix):
+def rename_features(feature_matrix, selected_features):
+    feature_matrix = feature_matrix.rename(columns=selected_features)
     descriptions = (
         feature_matrix.columns.to_series()
         .apply(lambda x: x.replace('_', ' ').title())
     )
     feature_matrix.columns = descriptions
     return feature_matrix
+
+# Filtrar feature_matrix usando libreria featureTools
+def filter_feature_matrix(feature_matrix):
+    print('- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ')
+    print(f'Shape before filtering: {feature_matrix.shape[1]}')
+    filtered_features_matrix = ft.selection.remove_low_information_features(feature_matrix)
+    filtered_features_matrix = ft.selection.remove_highly_correlated_features(filtered_features_matrix)
+    filtered_features_matrix = ft.selection.remove_highly_null_features(filtered_features_matrix)
+    filtered_features_matrix = ft.selection.remove_single_value_features(filtered_features_matrix)
+    print(f'Shape after filtering: {filtered_features_matrix.shape[1]}')
+    print('- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ')
+    return filtered_features_matrix
