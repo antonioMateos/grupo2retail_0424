@@ -120,6 +120,9 @@ def plot_pca_variance(explained_variance):
     ax.set_ylabel('Varianza Explicada Acumulada')
     ax.set_title('Varianza Explicada por Componentes Principales')
 
+    # Uso de escala logarítmica para el eje Y
+    ax.set_yscale('log')
+
     for i, (var, cum_var) in enumerate(zip(explained_variance, cumsum_variance)):
         ax.text(i, cum_var + 0.02, f'{cum_var:.2f}', ha='center', va='bottom', fontsize=10)
 
@@ -131,7 +134,7 @@ def pca_variance_plot(df, n_components=None):
     for i, var in enumerate(explained_variance):
         print(f"Principal Component {i+1}: {var:.2f}")
     fig = plot_pca_variance(explained_variance)
-    plt.show()
+    # plt.show()
     return explained_variance
 
 def calculate_feature_importances(X, y):
@@ -163,13 +166,10 @@ def get_feature_importances(df, clusters, imp_threshold=0.05):
     plt.show()
     return importance_df
 
-def redux_dimensions_pca_and_cluster(df, n_clusters=3, n_components=2, cluster_col='Cluster'):
-    # Separate features from the cluster column
-    features = df.drop(columns=[cluster_col], errors='ignore')
-    
+def perform_pca(data, n_clusters, n_components=1):
     # Perform PCA
     pca = PCA(n_components=n_components)
-    pca_results = pca.fit_transform(features)
+    pca_results = pca.fit_transform(data)
     
     # Create DataFrame with PCA results
     pca_columns = [f'PC{i+1}' for i in range(n_components)]
@@ -178,10 +178,12 @@ def redux_dimensions_pca_and_cluster(df, n_clusters=3, n_components=2, cluster_c
     # Apply KMeans clustering to the PCA results
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     pca_df[cluster_col] = kmeans.fit_predict(pca_df)
+
+    data_with_clusters = add_cluster_labels(data, kmeans.labels_)
     
     # Calculate loadings
     loadings = pca.components_.T
-    feature_names = features.columns
+    feature_names = data.columns
     
     # Create importance DataFrame
     importance_df = pd.DataFrame({
@@ -192,6 +194,14 @@ def redux_dimensions_pca_and_cluster(df, n_clusters=3, n_components=2, cluster_c
     
     if n_components < 2:
         importance_df = importance_df[['Feature', 'Loading_PC1']]
+
+    return pca, pca_df, importance_df
+
+def redux_dimensions_pca_and_cluster(df, n_clusters=3, n_components=2):
+    # Separate features from the cluster column
+    features = df.drop(columns=[cluster_col], errors='ignore')
+
+    pca, pca_df, importance_df = perform_pca(features, n_clusters, n_components)
 
     # Create plots
     figs = plot_pca_results(pca_df, importance_df, n_components)
@@ -236,3 +246,42 @@ def plot_pca_results(pca_df, importance_df, n_components):
     figs.append(fig)
     
     return figs
+
+# DESCRIPCION DE CLUSTERS
+# Pendiente añadir información a items originales
+# Ver grafico de barras de items por cluster
+# Crear etiquetas explicativas de los clusters en funcion de su descripcion
+def pca_and_cluster(df, n_clusters=3, n_components=2):
+    
+    # # Perform PCA
+    pca, pca_df, importance_df = perform_pca(df, n_clusters, n_components)
+    
+    # Añadir los resultados al DataFrame original
+    df_with_pca = df.copy()
+    # df_with_pca[pca_columns] = pca_df[pca_columns]
+    df_with_pca[pca_df.columns.tolist()] = pca_df[pca_df.columns.tolist()]
+    df_with_pca['Cluster'] = pca_df['Cluster']
+    
+    return df_with_pca, importance_df
+
+def create_cluster_descriptions(df_with_pca, importance_df):
+    cluster_descriptions = {}
+    
+    for cluster in df_with_pca['Cluster'].unique():
+        cluster_data = df_with_pca[df_with_pca['Cluster'] == cluster]
+        
+        # Calcular las medias de las características originales para cada cluster
+        cluster_means = cluster_data.mean()
+        
+        # Seleccionar las características más importantes basadas en las importancias de las feat en los pca
+        # important_features = importance_df.head(5)['Feature'] 
+        important_features = importance_df['Feature'] # --> filtramos fuera según importancia
+        important_means = cluster_means[important_features]
+        
+        description = pd.Series(important_means, name=f'Cluster {cluster}')
+        cluster_descriptions[cluster] = description
+    
+    # Convertir el diccionario en un DataFrame
+    description_df = pd.DataFrame(cluster_descriptions)
+    
+    return description_df

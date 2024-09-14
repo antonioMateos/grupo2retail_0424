@@ -1,4 +1,5 @@
 import featuretools as ft
+import re
 
 def create_features(df_items, df_shops, df_ws, fc_config):
     # Crear el EntitySet
@@ -35,9 +36,12 @@ def create_features(df_items, df_shops, df_ws, fc_config):
 
 # Obtener descripciones de las características
 def get_features_descriptions(features):
+    descriptions = []  # Inicializar lista vacía
     for desc in features:
         feat_desc = ft.describe_feature(desc)
-        print(f'{desc}: {feat_desc}')
+        descriptions.append(f'{desc}: {feat_desc}')  # Agregar a la lista
+        # print(f'{desc}: {feat_desc}')
+    return descriptions
 
 # Seleccionar caracteristicas
 def select_features(feature_matrix, selected_features):
@@ -53,6 +57,26 @@ def rename_features(feature_matrix, selected_features):
     )
     feature_matrix.columns = descriptions
     return feature_matrix
+
+def select_features(features, substrings):
+    # Subcadenas que quieres buscar
+    # substrings = ['(sales.', '(raw_earn)', '.sell_price)']
+    filtered_features = [feature for feature in features if any(sub in feature for sub in substrings)]
+
+    filtered_features = extract_feature_name(filtered_features) # Nos quedamos solo con la parte del str que necesitamos
+
+    return filtered_features
+
+def extract_feature_name(features):
+    extracted_features = []
+    pattern = r'<Feature:\s*(.*?)>'  # Expresión regular para capturar el texto entre "<Feature:" y ">"
+    
+    for feature in features:
+        match = re.search(pattern, feature)
+        if match:
+            extracted_features.append(match.group(1).strip())  # Capturamos la parte deseada
+
+    return extracted_features
 
 # Filtrar feature_matrix usando libreria featureTools
 def filter_feature_matrix(feature_matrix):
