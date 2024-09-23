@@ -11,8 +11,8 @@ import seaborn as sns
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 # Config
-DATE_COL = 'fecha'
-SALES_COL = 'cifra'
+DATE_COL = 'date'
+SALES_COL = 'raw_earn'
 
 def filter_data(data, col, value):
     return data[data[col] == value]

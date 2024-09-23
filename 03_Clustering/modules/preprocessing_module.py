@@ -32,7 +32,7 @@ def preprocess_features(feature_matrix):
         # Obtener el nombre de las columnas después de la transformación
         all_columns = numeric_columns.copy()  # Empezamos con las columnas numéricas
 
-        if categorical_columns:
+        if 'cat' in preprocessor.named_transformers_ and categorical_columns:
             encoded_columns = preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_columns)
             all_columns += encoded_columns.tolist()
 

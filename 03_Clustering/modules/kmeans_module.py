@@ -285,3 +285,29 @@ def create_cluster_descriptions(df_with_pca, importance_df):
     description_df = pd.DataFrame(cluster_descriptions)
     
     return description_df
+
+def plot_clusters_with_name(data):
+    cluster_counts = data['cluster_name'].value_counts()
+
+    # Crear una lista de colores, uno para cada barra utilizando la nueva sintaxis
+    colors = plt.colormaps.get_cmap('tab10')  # Usar un colormap con diferentes colores
+
+    # Crear el gráfico de barras
+    plt.figure(figsize=(15,8))
+    bars = plt.bar(cluster_counts.index, cluster_counts.values, color=[colors(i) for i in range(len(cluster_counts))])
+
+    # Añadir etiquetas y título
+    plt.title('Número de Elementos Únicos por Cluster Name', fontsize=16)
+    plt.xlabel(' ', fontsize=14)
+
+    # Añadir el número total de ítems en la parte superior de cada barra
+    for bar in bars:
+        yval = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, yval, int(yval), ha='center', va='bottom', fontsize=14)
+
+    # Ajustar rotación de etiquetas y márgenes
+    plt.xticks(rotation=0, fontsize=14)
+    plt.tight_layout()
+
+    # Mostrar el gráfico
+    plt.show()
