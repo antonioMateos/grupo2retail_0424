@@ -306,7 +306,7 @@ def plot_clusters_with_name(data):
         plt.text(bar.get_x() + bar.get_width()/2, yval, int(yval), ha='center', va='bottom', fontsize=14)
 
     # Ajustar rotación de etiquetas y márgenes
-    plt.xticks(rotation=0, fontsize=14)
+    plt.xticks(rotation=45, fontsize=12)
     plt.tight_layout()
 
     # Mostrar el gráfico
