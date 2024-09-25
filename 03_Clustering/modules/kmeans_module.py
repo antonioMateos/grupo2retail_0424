@@ -248,7 +248,7 @@ def plot_pca_results(pca_df, importance_df, n_components):
     return figs
 
 # DESCRIPCION DE CLUSTERS
-# Pendiente añadir información a items originales
+# Añadir información a items originales
 # Ver grafico de barras de items por cluster
 # Crear etiquetas explicativas de los clusters en funcion de su descripcion
 def pca_and_cluster(df, n_clusters=3, n_components=2):
@@ -275,7 +275,7 @@ def create_cluster_descriptions(df_with_pca, importance_df):
         
         # Seleccionar las características más importantes basadas en las importancias de las feat en los pca
         # important_features = importance_df.head(5)['Feature'] 
-        important_features = importance_df['Feature'] # --> filtramos fuera según importancia
+        important_features = importance_df['Feature'] # --> filtramos fuera según threshold
         important_means = cluster_means[important_features]
         
         description = pd.Series(important_means, name=f'Cluster {cluster}')
