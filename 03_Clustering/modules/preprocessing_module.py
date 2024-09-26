@@ -21,7 +21,7 @@ def preprocess_features(feature_matrix):
         
         # Agregar el OneHotEncoder para las columnas categóricas si existen
         if categorical_columns:
-            transformers.append(('cat', OneHotEncoder(drop='first', sparse=False), categorical_columns))
+            transformers.append(('cat', OneHotEncoder(drop='first', sparse_output=False), categorical_columns))
 
         # Crear el preprocesador con los transformadores existentes
         preprocessor = ColumnTransformer(transformers)

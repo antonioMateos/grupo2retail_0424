@@ -68,6 +68,61 @@ def apply_kmeans_and_plot(optimal_k, data, feature_matrix):
     plt.show()
     return kmeans, feature_matrix_with_clusters
 
+def view_pca_variance(data):
+    """
+    Aplica PCA al DataFrame y grafica la varianza explicada acumulada y por componente.
+    
+    Parameters:
+    data (DataFrame): DataFrame con las características (features) sin incluir la columna 'Cluster'.
+    """
+    fig_size = (10, 5)
+
+    if 'Cluster' in data.columns:
+        data = data.drop(columns=['Cluster'])
+
+    data = data.select_dtypes(include='number') # Nos quedamos solo con las columnas numericas
+
+    # Aplicar PCA
+    pca = PCA(n_components=None)  # Mantener todos los componentes
+    pca_result = pca.fit_transform(data)
+
+    # Obtener la varianza explicada en porcentaje
+    variance_ratio = pca.explained_variance_ratio_ * 100  # Convertir a porcentaje
+
+    # Crear una figura con dos subplots uno al lado del otro
+    fig, ax = plt.subplots(1, 2, figsize=fig_size)  # 1 fila, 2 columnas
+
+    # Gráfico 1: Varianza explicada acumulada
+    ax[0].plot(np.cumsum(variance_ratio), color='orange')
+    ax[0].set_xlabel('Número de Componentes')
+    ax[0].set_ylabel('Varianza Explicada Acumulada (%)')
+    ax[0].set_title('Varianza Explicada Acumulada')
+
+    # Añadir líneas verticales discontinuas en gris en cada componente
+    for i in range(1, len(variance_ratio) + 1):
+        ax[0].axvline(x=i, color='gray', linestyle='--', alpha=0.7)
+    ax[0].grid(True)
+
+    # Gráfico 2: Varianza explicada por componente
+    ax[1].bar(range(1, len(variance_ratio) + 1), variance_ratio, alpha=0.7, color='orange', align='center')
+    ax[1].set_ylabel('Porcentaje de Varianza Explicada')
+    ax[1].set_xlabel('Número de Componente Principal')
+    ax[1].set_title('Varianza Explicada por Componentes')
+
+    # Añadir líneas verticales discontinuas en gris en cada componente
+    for i in range(1, len(variance_ratio) + 1):
+        ax[1].axvline(x=i, color='gray', linestyle='--', alpha=0.7)
+    ax[1].grid(True)
+
+    # Ajustar los espacios entre los subplots para evitar que se solapen
+    plt.tight_layout()
+
+    # Mostrar los gráficos
+    plt.show()
+
+    # Mostrar la varianza explicada en porcentaje para cada componente
+    print("Varianza explicada por cada componente (%):", variance_ratio)
+
 def pca_visualization_2d(df):
     # Check if cluster_col exists in df
     if cluster_col not in df.columns:
