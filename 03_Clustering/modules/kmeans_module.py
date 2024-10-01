@@ -7,7 +7,8 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import silhouette_score
 from sklearn.model_selection import train_test_split
-from scipy.spatial import ConvexHull
+from sklearn.manifold import TSNE
+from sklearn.preprocessing import RobustScaler
 
 cluster_col = 'Cluster'
 
@@ -75,28 +76,31 @@ def view_pca_variance(data):
     Parameters:
     data (DataFrame): DataFrame con las características (features) sin incluir la columna 'Cluster'.
     """
-    fig_size = (10, 5)
+    fig_size = (15, 10)  # Ajustar tamaño para dos gráficos uno encima del otro
 
     if 'Cluster' in data.columns:
         data = data.drop(columns=['Cluster'])
 
-    data = data.select_dtypes(include='number') # Nos quedamos solo con las columnas numericas
+    data = data.select_dtypes(include='number')  # Quedarse solo con columnas numéricas
 
     # Aplicar PCA
     pca = PCA(n_components=None)  # Mantener todos los componentes
     pca_result = pca.fit_transform(data)
 
     # Obtener la varianza explicada en porcentaje
-    variance_ratio = pca.explained_variance_ratio_ * 100  # Convertir a porcentaje
+    variance_ratio = np.round(pca.explained_variance_ratio_ * 100, decimals=1)
 
-    # Crear una figura con dos subplots uno al lado del otro
-    fig, ax = plt.subplots(1, 2, figsize=fig_size)  # 1 fila, 2 columnas
+    # Crear una figura con dos subplots uno encima del otro
+    fig, ax = plt.subplots(2, 1, figsize=fig_size)  # 2 filas, 1 columna
 
     # Gráfico 1: Varianza explicada acumulada
     ax[0].plot(np.cumsum(variance_ratio), color='orange')
     ax[0].set_xlabel('Número de Componentes')
     ax[0].set_ylabel('Varianza Explicada Acumulada (%)')
     ax[0].set_title('Varianza Explicada Acumulada')
+
+    # Añadir línea horizontal roja en el 90%
+    ax[0].axhline(y=90, color='red', linestyle='--', linewidth=1.5)
 
     # Añadir líneas verticales discontinuas en gris en cada componente
     for i in range(1, len(variance_ratio) + 1):
@@ -123,49 +127,18 @@ def view_pca_variance(data):
     # Mostrar la varianza explicada en porcentaje para cada componente
     print("Varianza explicada por cada componente (%):", variance_ratio)
 
-def pca_visualization_2d(df):
-    # Check if cluster_col exists in df
-    if cluster_col not in df.columns:
-        raise ValueError(f"Column '{cluster_col}' not found in the DataFrame")
+    return variance_ratio
 
-    # Separate features and cluster labels
-    features = df.drop(columns=[cluster_col])
-    cluster_labels = df[cluster_col]
 
-    # Perform PCA
-    pca = PCA(n_components=2)
-    pca_features = pca.fit_transform(features)
+def calculate_accumulated_variance(variance_ratio):
+    # Calcular la varianza explicada acumulada
+    accumulated_variance = np.cumsum(variance_ratio)
     
-    # Create PCA DataFrame
-    pca_df = pd.DataFrame(data=pca_features, columns=['PCA1', 'PCA2'])
+    # Crear un DataFrame con una fila y tantas columnas como componentes
+    df = pd.DataFrame([accumulated_variance], 
+                      columns=[f'Componente {i+1}' for i in range(len(variance_ratio))])
     
-    # Add cluster labels to the PCA results
-    pca_df[cluster_col] = cluster_labels.values
-    
-    # Create the plot
-    fig, ax = plt.subplots(figsize=(10, 8))
-    scatter = ax.scatter(pca_df['PCA1'], pca_df['PCA2'], c=pca_df[cluster_col], cmap='viridis')
-    plt.colorbar(scatter)
-    ax.set_xlabel('PCA1')
-    ax.set_ylabel('PCA2')
-    ax.set_title('Visualización de Clusters en 2D con PCA')
-    
-    # Display the plot
-    plt.show()
-    
-    return pca_df
-
-# Helper function to perform PCA (if needed elsewhere)
-def perform_pca(df, n_components=2):
-    pca = PCA(n_components=n_components)
-    pca_features = pca.fit_transform(df)
-    return pd.DataFrame(data=pca_features, columns=[f'PCA{i+1}' for i in range(n_components)])
-
-def calculate_pca_variance(df, n_components=None):
-    n_components = n_components or df.shape[1]
-    pca = PCA(n_components=n_components)
-    pca.fit(df)
-    return pca.explained_variance_ratio_
+    return df
 
 def plot_pca_variance(explained_variance):
     fig, ax = plt.subplots(figsize=(12, 5))
@@ -183,14 +156,6 @@ def plot_pca_variance(explained_variance):
 
     ax.grid(True)
     return fig
-
-def pca_variance_plot(df, n_components=None):
-    explained_variance = calculate_pca_variance(df, n_components)
-    for i, var in enumerate(explained_variance):
-        print(f"Principal Component {i+1}: {var:.2f}")
-    fig = plot_pca_variance(explained_variance)
-    # plt.show()
-    return explained_variance
 
 def calculate_feature_importances(X, y):
     rf = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -233,74 +198,60 @@ def perform_pca(data, n_clusters, n_components=1):
     # Apply KMeans clustering to the PCA results
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     pca_df[cluster_col] = kmeans.fit_predict(pca_df)
-
-    data_with_clusters = add_cluster_labels(data, kmeans.labels_)
     
-    # Calculate loadings
+    # Calcular las cargas (loadings)
     loadings = pca.components_.T
     feature_names = data.columns
-    
-    # Create importance DataFrame
-    importance_df = pd.DataFrame({
-        'Feature': feature_names,
-        'Loading_PC1': loadings[:, 0],
-        'Loading_PC2': loadings[:, 1] if n_components > 1 else np.nan
-    }).sort_values(by='Loading_PC1', ascending=False)
-    
-    if n_components < 2:
-        importance_df = importance_df[['Feature', 'Loading_PC1']]
+    n_components = loadings.shape[1]  # Obtener el número de componentes
 
-    return pca, pca_df, importance_df
+    # Crear un diccionario para almacenar las cargas de cada componente
+    loading_dict = {'Feature': feature_names}
 
-def redux_dimensions_pca_and_cluster(df, n_clusters=3, n_components=2):
-    # Separate features from the cluster column
-    features = df.drop(columns=[cluster_col], errors='ignore')
+    # Añadir las cargas para cada componente al diccionario
+    for i in range(n_components):
+        loading_dict[f'Loading_PC{i+1}'] = loadings[:, i]
 
-    pca, pca_df, importance_df = perform_pca(features, n_clusters, n_components)
+    # Crear el DataFrame de importancia de características
+    loadings_df = pd.DataFrame(loading_dict).sort_values(by=f'Loading_PC1', ascending=False)
 
-    # Create plots
-    figs = plot_pca_results(pca_df, importance_df, n_components)
+    return pca, pca_df, loadings_df
+
+# Visualizacion T-SNE clusters
+def tsne_visualization(data, n_components=2, perplexity=30):
+    '''
+    data === df_with_pca -> solo con columnas de componentes
+    '''
+    # 1. Preparar los datos
+    # Obtenemos columnas componentes y cluster
+    pc_cols = data.columns.tolist()
+    pc_cols.remove(cluster_col)
+    components = data[pc_cols]
+    clusters = data[cluster_col]
+
+    # 2. Estandarizar los datos
+    scaler = RobustScaler()
+    components_scaled = scaler.fit_transform(components)
+
+    # 3. Aplicar t-SNE
+    tsne = TSNE(n_components=n_components, random_state=42, perplexity=perplexity)
+    tsne_results = tsne.fit_transform(components_scaled)
+
+    # 4. Crear un DataFrame con los resultados de t-SNE y los clusters
+    df_tsne = pd.DataFrame(tsne_results, columns=['TSNE_1', 'TSNE_2'])
+    df_tsne[cluster_col] = clusters
+
+    # 5. Visualizar los resultados
+    plt.figure(figsize=(15, 5))
+    scatter = plt.scatter(df_tsne['TSNE_1'], df_tsne['TSNE_2'], 
+                        c=df_tsne['Cluster'], cmap='viridis', alpha=0.6)
+
+    # Añadir leyenda
+    plt.title('Visualizacion clusters 2D t-SNE')
+    plt.xlabel('t-SNE Componente 1')
+    plt.ylabel('t-SNE Componente 2')
+    plt.colorbar(scatter, label='Cluster')
+    plt.grid(True)
     plt.show()
-    
-    return pca_df, importance_df
-
-def plot_pca_results(pca_df, importance_df, n_components):
-    figs = []
-    
-    fig, ax = plt.subplots(figsize=(15, 5))
-    importance_df[['Feature', 'Loading_PC1']].plot(kind='barh', x='Feature', y='Loading_PC1', color='skyblue', ax=ax, legend=False)
-    ax.set_xlabel('Carga en PC1')
-    ax.set_title('Importancia de las Características en el Primer Componente Principal')
-    ax.invert_yaxis()
-    ax.grid(True)
-    figs.append(fig)
-
-    if n_components > 1:
-        fig, ax = plt.subplots(figsize=(15, 5))
-        importance_df[['Feature', 'Loading_PC2']].plot(kind='barh', x='Feature', y='Loading_PC2', color='lightgreen', ax=ax, legend=False)
-        ax.set_xlabel('Carga en PC2')
-        ax.set_title('Importancia de las Características en el Segundo Componente Principal')
-        ax.invert_yaxis()
-        ax.grid(True)
-        figs.append(fig)
-
-    fig, ax = plt.subplots(figsize=(15, 5))
-    if n_components == 1:
-        ax.scatter(pca_df['PC1'], np.zeros_like(pca_df['PC1']), c=pca_df[cluster_col], cmap='viridis', marker='o')
-        ax.set_xlabel('Principal Component 1')
-        ax.set_ylabel('Valor (fijo en 0)')
-        ax.set_title('Clustering después de PCA con 1 componente')
-    elif n_components == 2:
-        scatter = ax.scatter(pca_df['PC1'], pca_df['PC2'], c=pca_df[cluster_col], cmap='viridis', marker='o')
-        ax.set_xlabel('Principal Component 1')
-        ax.set_ylabel('Principal Component 2')
-        ax.set_title('Clustering después de PCA con 2 componentes')
-        plt.colorbar(scatter, label=cluster_col, ax=ax)
-    
-    ax.grid(True)
-    figs.append(fig)
-    
-    return figs
 
 # DESCRIPCION DE CLUSTERS
 # Añadir información a items originales
@@ -309,7 +260,7 @@ def plot_pca_results(pca_df, importance_df, n_components):
 def pca_and_cluster(df, n_clusters=3, n_components=2):
     
     # # Perform PCA
-    pca, pca_df, importance_df = perform_pca(df, n_clusters, n_components)
+    pca, pca_df, loadings_df = perform_pca(df, n_clusters, n_components)
     
     # Añadir los resultados al DataFrame original
     df_with_pca = df.copy()
@@ -317,7 +268,7 @@ def pca_and_cluster(df, n_clusters=3, n_components=2):
     df_with_pca[pca_df.columns.tolist()] = pca_df[pca_df.columns.tolist()]
     df_with_pca['Cluster'] = pca_df['Cluster']
     
-    return df_with_pca, importance_df
+    return df_with_pca, loadings_df
 
 def create_cluster_descriptions(df_with_pca, importance_df):
     cluster_descriptions = {}
@@ -328,8 +279,7 @@ def create_cluster_descriptions(df_with_pca, importance_df):
         # Calcular las medias de las características originales para cada cluster
         cluster_means = cluster_data.mean()
         
-        # Seleccionar las características más importantes basadas en las importancias de las feat en los pca
-        # important_features = importance_df.head(5)['Feature'] 
+        # Seleccionar las características más importantes basadas en las importancias de las feat en random forest
         important_features = importance_df['Feature'] # --> filtramos fuera según threshold
         important_means = cluster_means[important_features]
         
