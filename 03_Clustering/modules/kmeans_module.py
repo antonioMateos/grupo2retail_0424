@@ -260,7 +260,7 @@ def tsne_visualization(data, n_components=2, perplexity=30):
 def pca_and_cluster(df, n_clusters=3, n_components=2):
     
     # # Perform PCA
-    pca, pca_df, loadings_df = perform_pca(df, n_clusters, n_components)
+    pca, pca_df,   = perform_pca(df, n_clusters, n_components)
     
     # Añadir los resultados al DataFrame original
     df_with_pca = df.copy()
