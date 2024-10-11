@@ -9,7 +9,7 @@ def create_features(df_items, df_shops, df_ws, fc_config):
     es = es.add_dataframe(dataframe_name="items", dataframe=df_items, index="item")
     es = es.add_dataframe(dataframe_name="shops", dataframe=df_shops, index="store_code")
     es = es.add_dataframe(dataframe_name="sales", dataframe=df_ws, 
-                          index="id", make_index=True, time_index="week")
+                          index="id", make_index=True, time_index="week") # Hay que cambiar time index a day??
 
     # Definir las relaciones entre tablas
     es = es.add_relationship("shops", "store_code", "sales", "store_code")

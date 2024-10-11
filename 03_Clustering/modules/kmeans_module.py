@@ -39,7 +39,8 @@ def plot_elbow_silhouette(data, max_k=10):
     plt.show()
 
 def apply_kmeans(data, optimal_k):
-    kmeans = KMeans(n_clusters=optimal_k, random_state=42)
+    # kmeans = KMeans(n_clusters=optimal_k, random_state=42)
+    kmeans = KMeans(n_clusters=optimal_k, random_state=42, init="random", n_init="auto")
     return kmeans.fit(data)
 
 def add_cluster_labels(feature_matrix, kmeans_labels):
